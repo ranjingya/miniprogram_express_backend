@@ -1,4 +1,5 @@
 from routes import app, request, jsonify, requests
+from utils.express_util import QueryHistoryUtil
 from utils.token_util import TokenUtil
 
 
@@ -7,6 +8,8 @@ from utils.token_util import TokenUtil
 def get_express():
     express_no = request.args.get('no')
     express_type = request.args.get('type')
+    token= request.headers.get('Authorization')
+    open_id = TokenUtil.verify_token(token)['open_id']
 
     params = {'no': express_no}
     if express_type:
@@ -24,13 +27,24 @@ def get_express():
         exit()
 
     http_status_code = res.status_code
-
-    if http_status_code == 200:
+    data = res.json()
+    query_result = data['result']
+    print('data:', data)
+    print('query_result:', query_result)
+    if int(data['status']) == 0:
+        QueryHistoryUtil.add_query_history(open_id, query_result)
         return TokenUtil.response_refresh_token(jsonify({
             'code': 200,
             'msg': 'success',
-            'data': res.json()
+            'data': data
         }))
+    if int(data['status']) == 201:
+        return TokenUtil.response_refresh_token(jsonify({
+            'code': 201,
+            'msg': '快递单号错误',
+        }))
+
+
     else:
         http_reason = res.headers['X-Ca-Error-Message']
         if http_status_code == 400 and http_reason == 'Invalid Param Location':
@@ -52,3 +66,34 @@ def get_express():
             print(http_status_code)
             print(http_reason)
 
+
+@app.route('/get-query-history', methods=['GET'])
+def get_query_history():
+    # 获取open_id
+    token = request.headers.get('Authorization')
+    open_id = TokenUtil.verify_token(token)['open_id']
+
+    # 获取参数
+    page = int(request.args.get('page'))
+    count = int(request.args.get('count'))
+    express_id = None
+    if request.args.get('express_id') is not None:
+        express_id = request.args.get('express_id')
+    express_com_type = None
+    if request.args.get('express_com_type') is not None:
+        express_com_type = request.args.get('express_com_type')
+    offset = (page - 1) * count
+
+    # 从数据库中获取分页数据、符合条件的总数
+    total, query_history_list = (
+        QueryHistoryUtil.get_query_history_pagination(open_id, express_id, express_com_type, offset, count))
+
+    # 返回数据
+    return jsonify({
+        'code': 200,
+        'msg': 'success',
+        'data': {
+            'total': total,
+            'query_history_list': query_history_list
+        }
+    })

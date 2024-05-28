@@ -3,7 +3,7 @@ from routes import jwt, ExpiredSignatureError, os, time, random, string, redis, 
 # token_secret = os.getenv('SECRET_KEY')
 token_secret = 'iamthesecretkey'
 
-r = redis.Redis(host='localhost', port=6379)
+r = redis.StrictRedis(host='localhost', port=6379, decode_responses=True)
 
 
 class TokenUtil:
@@ -12,7 +12,7 @@ class TokenUtil:
     def gen_token(open_id):
         payload = {
             'open_id': open_id,
-            'iat': time.time(),  # 发行时间
+            'iat': time.time(),
             'exp': time.time() + 60 * 60 * 24 * 7,  # 过期时间 7天
             'jti': ''.join(random.choices(string.ascii_letters + string.digits, k=20))  # 随机JWT ID
         }
@@ -36,11 +36,7 @@ class TokenUtil:
         except:
             return None
 
-    @staticmethod
-    def is_within_seven_days(exp):
-        if exp - time.time() > 0:
-            return True
-
+    # 刷新token的response
     @staticmethod
     def response_refresh_token(body):
         response = make_response(body)

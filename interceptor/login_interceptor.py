@@ -1,22 +1,24 @@
-from routes import request, jsonify, app, g
+from routes import request, jsonify, app, g, datetime, time
 from utils.user_util import UserUtil, TokenUtil
 
 
 @app.before_request
 def before_all_request():
     url = request.path
-    if url == '/login':
-        return None
-    print('before_all_request')
+    print('before_all_request\n请求路径为：', url)
+    # if url == '/login':
+    #     return None
     token = request.headers.get('Authorization')
     if token:
         token_data = TokenUtil.verify_token(token)
-        # 如果token在七天内，更新token
-        if TokenUtil.is_within_seven_days(token_data['exp']):
+        print('用户open_id: ', token_data['open_id'])
+        print('token过期日期: ', datetime.fromtimestamp(token_data['exp']) )
+        # 如果token在一天内过期，更新token
+        if token_data['exp'] - time.time() < 60 * 60 * 24:
             TokenUtil.del_token(token_data['open_id'])
             new_token = TokenUtil.gen_token(token_data['open_id'])
             UserUtil.save_token(token_data['open_id'], new_token)
-            print('token在七天内，更新token：', new_token)
+            print('token在一天内过期，更新token：', new_token)
             # 将新token存入全局g对象中
             g.new_token = new_token
 
@@ -24,8 +26,7 @@ def before_all_request():
 @app.before_request
 def before_request():
     url = request.path
-    print('请求路径为：', url)
-    if url == '/login' or url == '/get-weather':
+    if url == '/login' or url == '/get-weather' or url.startswith('/goods'):
         return None
     token = request.headers.get('Authorization')
     if not token:
@@ -36,7 +37,8 @@ def before_request():
         }), 401
 
     # 检查token是否存在于Redis中
-    is_exist_redis_openid = UserUtil.exist_redis_open_id(token)
+    open_id = TokenUtil.verify_token(token)['open_id']
+    is_exist_redis_openid = UserUtil.exist_redis_open_id(open_id)
     if not is_exist_redis_openid:
         print('token不存在于Redis中')
         return jsonify({
