@@ -17,7 +17,7 @@ def get_express():
 
     host = 'https://wuliu.market.alicloudapi.com'
     path = '/kdi'
-    appcode = '40397b8a4b06429796874563354c3bfe'
+    appcode = ''    # 改成你自己的appcode，可从阿里云云市场获取快递查询接口
     url = host + path
     header = {"Authorization": 'APPCODE ' + appcode}
     try:
